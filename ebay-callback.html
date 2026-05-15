@@ -6,8 +6,9 @@
     <title>Returning to ComicFlow…</title>
     <meta http-equiv="refresh" content="0; url=comicflow://ebay-callback" id="meta" />
     <style>
+      :root { color-scheme: dark; }
       body {
-        font: 15px -apple-system, system-ui, sans-serif;
+        font: 16px -apple-system, system-ui, sans-serif;
         background: #111;
         color: #eee;
         display: flex;
@@ -18,10 +19,7 @@
         text-align: center;
         padding: 20px;
       }
-      a {
-        color: #7c3aed;
-        font-weight: 700;
-      }
+      .card { max-width: 420px; }
       .badge {
         display: inline-block;
         margin-bottom: 18px;
@@ -33,38 +31,78 @@
         text-transform: uppercase;
         color: #cdb6ee;
       }
+      .returning { color: #aaa; font-size: 14px; margin: 16px 0 28px; }
+      .btn {
+        display: inline-block;
+        padding: 18px 32px;
+        background: #7c3aed;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 700;
+        text-decoration: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 18px rgba(124, 58, 237, 0.4);
+        transition: transform 0.1s ease;
+      }
+      .btn:active { transform: scale(0.96); }
+      .hint {
+        margin-top: 22px;
+        font-size: 12px;
+        color: #888;
+        line-height: 1.5;
+      }
     </style>
   </head>
   <body>
-    <div>
+    <div class="card">
       <div class="badge">eBay → ComicFlow bridge</div>
-      <p>Returning to ComicFlow…</p>
-      <p>
-        <a id="link" href="comicflow://ebay-callback"
-          >Tap here if it doesn&rsquo;t open automatically</a
-        >
+      <p class="returning">Returning to ComicFlow…</p>
+      <a class="btn" id="link" href="comicflow://ebay-callback">
+        Open ComicFlow
+      </a>
+      <p class="hint">
+        If the app didn't open automatically, tap the button above.
+        Then close this window.
       </p>
     </div>
     <script>
       // Forward eBay's OAuth callback (?code=… etc.) to the app's
-      // custom URL scheme. This bridge exists because eBay requires
-      // HTTPS redirect URLs and won't accept comicflow:// directly.
-      // Hosted free on GitHub Pages from the ComicFlow repo.
+      // custom URL scheme. Tries multiple redirect paths for
+      // robustness — iOS sometimes blocks JS-driven custom-scheme
+      // navigation inside in-app browsers (SFAuthenticationSession,
+      // ASWebAuthenticationSession), but will accept it after a few
+      // attempts and from a user-tapped link.
       (function () {
         var qs = window.location.search || '';
         var hash = window.location.hash || '';
         var target = 'comicflow://ebay-callback' + qs + hash;
+
+        // 1. Update the meta-refresh + visible link to carry the
+        // eBay-supplied code through.
         var meta = document.getElementById('meta');
         if (meta) meta.setAttribute('content', '0; url=' + target);
         var link = document.getElementById('link');
         if (link) link.setAttribute('href', target);
-        try {
-          window.location.replace(target);
-        } catch (e) {
-          // location.replace is blocked in some browsers when the
-          // scheme isn't registered (desktop). The visible link is the
-          // fallback; meta-refresh will also try.
-        }
+
+        // 2. Immediate location.replace — works inside ASWebAuth on
+        // most iOS versions.
+        try { window.location.replace(target); } catch (e) {}
+
+        // 3. After 250ms, try assigning .href as a backup. Some
+        // iOS sandboxes block .replace but allow .href.
+        setTimeout(function () {
+          try { window.location.href = target; } catch (e) {}
+        }, 250);
+
+        // 4. After 600ms, try a synthetic click on the visible link.
+        // ASWebAuthenticationSession treats a link click on the page
+        // as effectively user-driven and reliably navigates to the
+        // custom scheme, closing the auth window automatically.
+        setTimeout(function () {
+          try {
+            if (link) link.click();
+          } catch (e) {}
+        }, 600);
       })();
     </script>
   </body>
